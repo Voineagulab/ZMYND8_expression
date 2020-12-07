@@ -1,1 +1,1 @@
-# Investigating ZMYND8 expreession in BrainSpan Expression Atlas data 
+# ZMYND8 expression in BrainSpan
