@@ -17,7 +17,8 @@ suppressPackageStartupMessages({
   library(pander)
   library(tidyr)
   library(viridis)
-  library(RColorBrewer)})
+  library(RColorBrewer)
+  library(stringr)})
 
 rm(list=ls())
 
@@ -27,10 +28,22 @@ path.data <- path.expand("BrainSpan/Kang")
 
 ### Load metadata file 
 columns_metadata <- read.csv(file.path(path.data, "columns_metadata.csv"), header = TRUE)
-
+counts_matrix <- read.csv(file.path(path.data, "expression_matrix.csv"), header= FALSE, row.names= 1)
+rows_metadata <- read.csv(file.path(path.data, "rows_metadata.csv"))
 
 ### Add stages based on the technical white paper 
 columns_metadata$age <-  gsub(" ","-", columns_metadata$age )
+
+
+
+levels(columns_metadata$age) <- c("8-pcw","12-pcw", "13-pcw", "16-pcw", 
+                                  "17-pcw", "19-pcw", "21-pcw",
+                                  "24-pcw", "25-pcw", "26-pcw", "35-pcw", 
+                                  "37-pcw", "4-mos", "10-mos", "1-yrs", 
+                                  "2-yrs","3-yrs", "4-yrs", "8-yrs", "11-yrs", 
+                                  "13-yrs", "15-yrs", "18-yrs", "19-yrs", "21-yrs", 
+                                  "23-yrs", "30-yrs", "36-yrs", "37-yrs", "40-yrs")
+
 
 columns_metadata$stage[columns_metadata$age == "8-pcw" | columns_metadata$age == "9-pcw"] <- "s02a" 
 columns_metadata$stage[columns_metadata$age == "12-pcw"] <- "s02b"
@@ -53,13 +66,6 @@ levels(columns_metadata$stage) <- c("s02a", "s02b", "s03a", "s03b", "s04", "s05"
                                     "s07", "s08", "s09", "s10", "s11", "s12", "s13")
 
 
-levels(columns_metadata$age) <- c("8-pcw","12-pcw", "13-pcw", "16-pcw", 
-                                  "17-pcw", "19-pcw", "21-pcw",
-                                  "24-pcw", "25-pcw", "26-pcw", "35-pcw", 
-                                  "37-pcw", "4-mos", "10-mos", "1-yrs", 
-                                  "2-yrs","3-yrs", "4-yrs", "8-yrs", "11-yrs", 
-                                  "13-yrs", "15-yrs", "18-yrs", "19-yrs", "21-yrs", 
-                                  "23-yrs", "30-yrs", "36-yrs", "37-yrs", "40-yrs")
 
 
 ### Period: Either prenatal or postnatal 
@@ -123,53 +129,19 @@ columns_metadata$regions[columns_metadata$structure_acronym == "MGE" |
 ##### else remove -yrs
 
 
+columns_metadata$numeric_age[grepl("pcw", columns_metadata$age, ignore.case = TRUE)]<-
+   columns_metadata$age[grepl("pcw", columns_metadata$age)] %>%  str_remove("-pcw")%>% 
+  as.numeric() %>% divide_by(-52)
+                              
 
-columns_metadata$ages[columns_metadata$age == "8-pcw"] <- -0.15
 
-columns_metadata$ages[columns_metadata$age == "9-pcw"] <- -0.17
+columns_metadata$numeric_age[grepl("mos", columns_metadata$age, ignore.case = TRUE)] <- 
+  columns_metadata$age[grepl("-mos", columns_metadata$age)] %>%  str_remove("-mos") %>% 
+  as.numeric() %>% divide_by(12)
 
-columns_metadata$ages[columns_metadata$age == "12-pcw"] <- -0.23
-
-columns_metadata$ages[columns_metadata$age == "13-pcw"] <- -0.25
-
-columns_metadata$ages[columns_metadata$age == "16-pcw"] <- -0.31
-
-columns_metadata$ages[columns_metadata$age == "17-pcw"] <- -0.32
-
-columns_metadata$ages[columns_metadata$age == "19-pcw"] <- -0.36
-
-columns_metadata$ages[columns_metadata$age == "21-pcw"] <- -0.40
-
-columns_metadata$ages[columns_metadata$age == "24-pcw"] <- -0.46
-
-columns_metadata$ages[columns_metadata$age == "25-pcw"] <- -0.48
-
-columns_metadata$ages[columns_metadata$age == "26-pcw"] <- -0.498
-
-columns_metadata$ages[columns_metadata$age == "35-pcw"] <- -0.67
-
-columns_metadata$ages[columns_metadata$age == "37-pcw"] <- -0.71
-
-columns_metadata$ages[columns_metadata$age == "4-mos"] <- 0.33
-columns_metadata$ages[columns_metadata$age == "10-mos"] <- 0.83
-columns_metadata$ages[columns_metadata$age == "1-yrs"] <- 1
-columns_metadata$ages[columns_metadata$age == "2-yrs"] <- 2
-columns_metadata$ages[columns_metadata$age == "3-yrs"] <- 3
-columns_metadata$ages[columns_metadata$age == "4-yrs"] <- 4
-columns_metadata$ages[columns_metadata$age == "8-yrs"] <- 8
-columns_metadata$ages[columns_metadata$age == "11-yrs"] <- 11
-columns_metadata$ages[columns_metadata$age == "13-yrs"] <- 13
-columns_metadata$ages[columns_metadata$age == "15-yrs"] <- 15
-columns_metadata$ages[columns_metadata$age == "18-yrs"] <- 18
-columns_metadata$ages[columns_metadata$age == "19-yrs"] <-  19
-columns_metadata$ages[columns_metadata$age == "21-yrs"] <- 21
-columns_metadata$ages[columns_metadata$age == "22-yrs"] <- 22
-columns_metadata$ages[columns_metadata$age == "23-yrs"] <- 23
-columns_metadata$ages[columns_metadata$age == "30-yrs"] <- 30
-columns_metadata$ages[columns_metadata$age == "36-yrs"] <- 36
-columns_metadata$ages[columns_metadata$age == "37-yrs"] <- 37
-columns_metadata$ages[columns_metadata$age == "40-yrs"] <- 40
-
+columns_metadata$numeric_age[grepl("yrs", columns_metadata$age, ignore.case = TRUE)] <- 
+  columns_metadata$age[grepl("-yrs", columns_metadata$age)] %>%  str_remove("-yrs") %>% 
+  as.numeric 
 
 
 
@@ -181,4 +153,22 @@ columns_metadata <- columns_metadata %>%
 
 
 
-write.csv(columns_metadata, "updated_metadata.csv")
+
+### Add ZMYND8 expression 
+
+colnames(counts_matrix) <- columns_metadata$name_for_matrix
+rownames(counts_matrix) <- rows_metadata$ensembl_gene_id
+
+
+
+ZMYND8_metaData <- counts_matrix["ENSG00000101040",] %>%
+  as.data.frame() %>% 
+  rownames_to_column("geneID") %>%
+  melt() %>% 
+  cbind(columns_metadata) %>% 
+  dplyr::rename(ZMYND8_expression = value) %>%
+  dplyr::select(-c(variable, column_num))
+
+
+
+write.csv(ZMYND8_metaData, "ZMYND8_metadata.csv")
